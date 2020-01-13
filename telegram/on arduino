@@ -7,6 +7,9 @@ Description: a simple example that do:
              2) if "LIGHT ON" message is received, turn on the onboard LED
              3) if "LIGHT OFF" message is received, turn off the onboard LED
              4) otherwise, reply to sender with a welcome message
+             
+Library : CTBot by stefano ledda (versi 4.4.0)
+          arduinojson by BenoitBlancon(v 5.13.5)
 
 */
 #include "CTBot.h"
