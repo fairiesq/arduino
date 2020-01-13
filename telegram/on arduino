@@ -1,107 +1,70 @@
-#include <SPI.h>
-#include <ESP8266WiFi.h>
+/*
+Name:        lightBot.ino
+Created:     17/01/2018
+Author:      Stefano Ledda <shurillu@tiscalinet.it>
+Description: a simple example that do:
+             1) parse incoming messages
+             2) if "LIGHT ON" message is received, turn on the onboard LED
+             3) if "LIGHT OFF" message is received, turn off the onboard LED
+             4) otherwise, reply to sender with a welcome message
 
-WiFiClient client;
-IPAddress ip;
-char ssid[] = "wePresentbelakang";
-int status = WL_IDLE_STATUS;
+*/
+#include "CTBot.h"
+CTBot myBot;
 
-// Initialize the Wifi client library
-
-
-// server address:
-char server[] = "www.arduino.cc";
-//IPAddress server(64,131,82,241);
-
-unsigned long lastConnectionTime = 0;            // last time you connected to the server, in milliseconds
-const unsigned long postingInterval = 10L * 1000L; // delay between updates, in milliseconds
+String ssid = "pms free";     // REPLACE mySSID WITH YOUR WIFI SSID
+String pass = "abcd1234";
+ // REPLACE myPassword YOUR WIFI PASSWORD, IF ANY
+String token = "907657366:AAH9xoq_bd_zL6CjHB1uTBzLD1HShICqboo";   // REPLACE myToken WITH YOUR TELEGRAM BOT TOKEN
+uint8_t led = D0;            // the onboard ESP8266 LED.    
+                            // If you have a NodeMCU you can use the BUILTIN_LED pin
+                            // (replace 2 with BUILTIN_LED)                            
 
 void setup() {
-  //Initialize serial and wait for port to open:
-  Serial.begin(9600);
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB port only
-  }
+    // initialize the Serial
+    Serial.begin(115200);
+    Serial.println("Starting TelegramBot...");
 
-  // check for the presence of the shield:
-  if (WiFi.status() == WL_NO_SHIELD) {
-    Serial.println("WiFi shield not present");
-    // don't continue:
-    while (true);
-  }
+    // connect the ESP8266 to the desired access point
+    myBot.wifiConnect(ssid, pass);
 
-  // attempt to connect to Wifi network:
-  while (status != WL_CONNECTED) {
-    Serial.print("Attempting to connect to SSID: ");
-    Serial.println(ssid);
-    // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
-    status = WiFi.begin(ssid);
+    // set the telegram bot token
+    myBot.setTelegramToken(token);
 
-    // wait 10 seconds for connection:
-    delay(10000);
-  }
-  // you're connected now, so print out the status:
-  printWifiStatus();
+    // check if all things are ok
+    if (myBot.testConnection())
+        Serial.println("\ntestConnection OK");
+    else
+        Serial.println("\ntestConnection NOK");
+
+    // set the pin connected to the LED to act as output pin
+    pinMode(led, OUTPUT);
+    digitalWrite(led, HIGH); // turn off the led (inverted logic!)
+
 }
 
 void loop() {
-  // if there's incoming data from the net connection.
-  // send it out the serial port.  This is for debugging
-  // purposes only:
-  while (client.available()) {
-    char c = client.read();
-    Serial.write(c);
-  }
-/*
-  // if ten seconds have passed since your last connection,
-  // then connect again and send data:
-  if (millis() - lastConnectionTime > postingInterval) {
-    httpRequest();
-  }
-*/
-    httpRequest();
-    delay(5000);
-  
-}
+    // a variable to store telegram message data
+    TBMessage msg;
 
-// this method makes a HTTP connection to the server:
-void httpRequest() {
-  // close any connection before send a new request.
-  // This will free the socket on the WiFi shield
-  client.stop();
+    // if there is an incoming message...
+    if (myBot.getNewMessage(msg)) {
 
-  // if there's a successful connection:
-  if (client.connect(server, 80)) {
-    Serial.println("connecting...");
-    // send the HTTP PUT request:
-    client.println("GET /latest.txt HTTP/1.1");
-    client.println("Host: www.arduino.cc");
-    client.println("User-Agent: ArduinoWiFi/1.1");
-    client.println("Connection: close");
-    client.println();
-
-    // note the time that the connection was made:
-    lastConnectionTime = millis();
-  } else {
-    // if you couldn't make a connection:
-    Serial.println("connection failed");
-  }
-}
-
-
-void printWifiStatus() {
-  // print the SSID of the network you're attached to:
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
-
-  // print your WiFi shield's IP address:
-  IPAddress ip = WiFi.localIP();
-  Serial.print("IP Address: ");
-  Serial.println(ip);
-
-  // print the received signal strength:
-  long rssi = WiFi.RSSI();
-  Serial.print("signal strength (RSSI):");
-  Serial.print(rssi);
-  Serial.println(" dBm");
+        if (msg.text.equalsIgnoreCase("LIGHT ON")) {              // if the received message is "LIGHT ON"...
+            digitalWrite(led, HIGH);                               // turn on the LED (inverted logic!)
+            myBot.sendMessage(msg.sender.id, "Light is now ON");  // notify the sender
+        }
+        else if (msg.text.equalsIgnoreCase("LIGHT OFF")) {        // if the received message is "LIGHT OFF"...
+            digitalWrite(led, LOW);                              // turn off the led (inverted logic!)
+            myBot.sendMessage(msg.sender.id, "Light is now OFF"); // notify the sender
+        }
+        else {                                                    // otherwise...
+            // generate the message for the sender
+            String reply;
+            reply = (String)"Welcome " + msg.sender.username + (String)". Try LIGHT ON or LIGHT OFF.";
+            myBot.sendMessage(msg.sender.id, reply);             // and send it
+        }
+    }
+    // wait 500 milliseconds
+    delay(500);
 }
